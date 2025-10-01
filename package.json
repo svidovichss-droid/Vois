@@ -1,0 +1,23 @@
+{
+  "name": "progress-calculator",
+  "version": "2.3.0",
+  "description": "Калькулятор срока годности продукции",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "build": "echo 'No build process required'",
+    "test": "echo 'No tests specified'"
+  },
+  "keywords": [
+    "calculator",
+    "shelf-life",
+    "pwa",
+    "offline"
+  ],
+  "author": "Quality Service",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/svidovichss-droid/ProgressSAP.github.io"
+  }
+}
