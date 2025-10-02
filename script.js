@@ -33,38 +33,32 @@ const voiceUtils = {
         return 'speechSynthesis' in window;
     },
     
-    // Получить голос Yandex Алиса
-    getYandexAliceVoice: () => {
+    // Получить любой доступный русский голос (временно)
+    getAvailableVoice: () => {
         const voices = speechSynthesis.getVoices();
         
-        // Точные названия голоса Yandex Алиса
-        const yandexAliceNames = [
-            'Yandex Alice',
-            'Yandex Алиса',
-            'Alice (Yandex)',
-            'Алиса (Yandex)',
-            'YandexAlice',
-            'Yandex.Alice'
-        ];
-        
-        // Ищем точное совпадение с Yandex Алиса
-        const yandexAliceVoice = voices.find(voice => 
-            yandexAliceNames.some(name => 
-                voice.name === name || voice.name.includes('Yandex') && voice.name.includes('Alice')
-            ) && voice.lang.includes('ru')
+        // Сначала ищем любой русский голос
+        const russianVoice = voices.find(voice => 
+            voice.lang.includes('ru') || voice.lang.includes('RU')
         );
         
-        if (yandexAliceVoice) {
-            console.log('🎵 Найден голос Yandex Алиса:', yandexAliceVoice.name);
-            return yandexAliceVoice;
+        if (russianVoice) {
+            console.log('✅ Используем голос:', russianVoice.name);
+            return russianVoice;
         }
         
-        console.log('⚠ Голос Yandex Алиса не найден. Проверьте настройки браузера.');
+        // Если нет русского, используем первый доступный
+        if (voices.length > 0) {
+            console.log('⚠ Русский голос не найден, используем:', voices[0].name);
+            return voices[0];
+        }
+        
+        console.log('❌ Голоса не найдены');
         return null;
     },
     
-    // Озвучить текст голосом Yandex Алиса
-    speak: (text, rate = 1.0, pitch = 1.0, volume = 0.9) => {
+    // Озвучить текст
+    speak: (text, rate = 1.0, pitch = 1.0, volume = 0.8) => {
         if (!voiceUtils.isSupported()) {
             console.log('Синтез речи не поддерживается браузером');
             return;
@@ -75,44 +69,42 @@ const voiceUtils = {
         
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ru-RU';
-        utterance.rate = rate;        // Нормальная скорость
-        utterance.pitch = pitch;      // Естественный тембр
-        utterance.volume = volume;    // Комфортная громкость
+        utterance.rate = rate;
+        utterance.pitch = pitch;
+        utterance.volume = volume;
         
-        // Устанавливаем голос Yandex Алиса
-        const yandexAliceVoice = voiceUtils.getYandexAliceVoice();
-        if (yandexAliceVoice) {
-            utterance.voice = yandexAliceVoice;
+        // Устанавливаем доступный голос
+        const availableVoice = voiceUtils.getAvailableVoice();
+        if (availableVoice) {
+            utterance.voice = availableVoice;
         } else {
-            // Если Yandex Алиса нет, не используем другие голоса
-            console.log('❌ Голос Yandex Алиса недоступен');
+            console.log('❌ Нет доступных голосов');
             return;
         }
         
         utterance.onstart = () => {
-            console.log('Алиса начинает говорить:', text);
+            console.log('🔊 Начато озвучивание:', text);
         };
         
         utterance.onerror = (event) => {
-            console.error('Ошибка синтеза речи Алисы:', event);
+            console.error('Ошибка синтеза речи:', event);
         };
         
         utterance.onend = () => {
-            console.log('Алиса завершила речь');
+            console.log('✅ Озвучивание завершено');
         };
         
         speechSynthesis.speak(utterance);
     },
     
-    // Озвучить уведомление в зависимости от типа
+    // Озвучить уведомление
     speakNotification: (message, type) => {
         if (!voiceUtils.isSupported()) return;
         
         let prefix = '';
-        
         switch(type) {
             case 'success':
-                prefix = '';
+                prefix = 'Успешно: ';
                 break;
             case 'warning':
                 prefix = 'Внимание: ';
@@ -124,53 +116,36 @@ const voiceUtils = {
                 prefix = '';
         }
         
-        // Проверяем доступность Алисы перед озвучкой
-        if (voiceUtils.getYandexAliceVoice()) {
-            voiceUtils.speak(prefix + message, 1.0, 1.0, 0.9);
-        }
+        voiceUtils.speak(prefix + message);
     },
     
     // Озвучить системные события
     speakSystemEvent: (message) => {
         if (!voiceUtils.isSupported()) return;
-        
-        // Проверяем доступность Алисы перед озвучкой
-        if (voiceUtils.getYandexAliceVoice()) {
-            voiceUtils.speak(message, 1.0, 1.0, 0.85);
-        }
+        voiceUtils.speak(message);
     },
     
     // Озвучить события загрузки данных
     speakDataEvent: (message) => {
         if (!voiceUtils.isSupported()) return;
-        
-        // Проверяем доступность Алисы перед озвучкой
-        if (voiceUtils.getYandexAliceVoice()) {
-            voiceUtils.speak(message, 1.0, 1.0, 0.85);
-        }
+        voiceUtils.speak(message);
     },
     
-    // Проверить, доступен ли голос Yandex Алиса
-    isAliceAvailable: () => {
-        return voiceUtils.isSupported() && voiceUtils.getYandexAliceVoice() !== null;
-    },
-    
-    // Показать статус голоса Алисы
-    showVoiceStatus: () => {
+    // Показать доступные голоса
+    showAvailableVoices: () => {
         if (!voiceUtils.isSupported()) {
-            console.log('❌ Синтез речи не поддерживается браузером');
+            console.log('❌ Синтез речи не поддерживается');
             return;
         }
         
-        const aliceVoice = voiceUtils.getYandexAliceVoice();
-        if (aliceVoice) {
-            console.log('✅ Голос Yandex Алиса доступен:', aliceVoice.name);
-        } else {
-            console.log('❌ Голос Yandex Алиса недоступен');
-            console.log('Доступные голоса:');
-            speechSynthesis.getVoices().forEach(voice => {
-                console.log(`- ${voice.name} (${voice.lang})`);
-            });
+        const voices = speechSynthesis.getVoices();
+        console.log('🎵 Доступные голоса:');
+        voices.forEach(voice => {
+            console.log(`- ${voice.name} (${voice.lang}) ${voice.default ? '[по умолчанию]' : ''}`);
+        });
+        
+        if (voices.length === 0) {
+            console.log('❌ Голосов не найдено. Проверьте настройки браузера.');
         }
     }
 };
@@ -338,10 +313,8 @@ async function loadProductsData() {
                     processProductsData(cached.data);
                     shouldUseCache = true;
                     
-                    // ОЗВУЧИВАЕМ использование кэшированных данных (только если Алиса доступна)
-                    if (voiceUtils.isAliceAvailable()) {
-                        voiceUtils.speakDataEvent('Данные загружены из кэша');
-                    }
+                    // ОЗВУЧИВАЕМ использование кэшированных данных
+                    voiceUtils.speakDataEvent('Данные загружены из кэша');
                 } else {
                     console.log('Обнаружены обновления, загружаем новые данные');
                     shouldUpdateCache = true;
@@ -390,10 +363,8 @@ async function loadProductsData() {
 
         // Загружаем новые данные если нужно
         if (shouldUpdateCache) {
-            // ОЗВУЧИВАЕМ начало загрузки (только если Алиса доступна)
-            if (voiceUtils.isAliceAvailable()) {
-                voiceUtils.speakDataEvent('Загружаем актуальные данные');
-            }
+            // ОЗВУЧИВАЕМ начало загрузки
+            voiceUtils.speakDataEvent('Загружаем актуальные данные');
             
             const response = await fetch(CONFIG.JSON_URL, {
                 cache: 'no-cache'
@@ -412,10 +383,8 @@ async function loadProductsData() {
             // Обрабатываем данные
             processProductsData(productsData);
             
-            // ОЗВУЧИВАЕМ успешную загрузку данных (только если Алиса доступна)
-            if (voiceUtils.isAliceAvailable()) {
-                voiceUtils.speakDataEvent('Данные успешно обновлены');
-            }
+            // ОЗВУЧИВАЕМ успешную загрузку данных
+            voiceUtils.speakDataEvent('Данные успешно обновлены');
             
             // Показываем уведомление об успешной загрузке
             if (cached) {
@@ -426,10 +395,8 @@ async function loadProductsData() {
     } catch (error) {
         console.error('Ошибка загрузки данных:', error);
         
-        // ОЗВУЧИВАЕМ ошибку загрузки (только если Алиса доступна)
-        if (voiceUtils.isAliceAvailable()) {
-            voiceUtils.speakNotification('Не удалось загрузить данные', 'error');
-        }
+        // ОЗВУЧИВАЕМ ошибку загрузки
+        voiceUtils.speakNotification('Не удалось загрузить данные', 'error');
         
         // Пытаемся использовать кэш, даже если он просрочен
         const cached = cacheUtils.getFromCache();
@@ -486,10 +453,8 @@ async function forceRefreshData() {
         return;
     }
     
-    // ОЗВУЧИВАЕМ начало принудительного обновления (только если Алиса доступна)
-    if (voiceUtils.isAliceAvailable()) {
-        voiceUtils.speakDataEvent('Обновляем данные');
-    }
+    // ОЗВУЧИВАЕМ начало принудительного обновления
+    voiceUtils.speakDataEvent('Обновляем данные');
     
     cacheUtils.clearCache();
     await loadProductsData();
@@ -678,10 +643,8 @@ function calculateExpiry() {
 
 // Показать уведомление
 function showNotification(message, type) {
-    // ОЗВУЧИВАЕМ уведомление голосом Yandex Алиса (только если доступна)
-    if (voiceUtils.isAliceAvailable()) {
-        voiceUtils.speakNotification(message, type);
-    }
+    // ОЗВУЧИВАЕМ уведомление
+    voiceUtils.speakNotification(message, type);
     
     const existingNotifications = document.querySelectorAll('.notification-message');
     existingNotifications.forEach(notification => notification.remove());
@@ -717,8 +680,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const initVoices = () => {
             const voices = speechSynthesis.getVoices();
             if (voices.length > 0) {
-                // Показываем статус голоса Алисы
-                voiceUtils.showVoiceStatus();
+                console.log('🔊 Инициализация голосового синтеза:');
+                voiceUtils.showAvailableVoices();
+                
+                // Тестируем голос
+                setTimeout(() => {
+                    voiceUtils.speak('Голосовое сопровождение активировано');
+                }, 1000);
             } else {
                 setTimeout(initVoices, 100);
             }
@@ -729,6 +697,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Некоторые браузеры загружают голоса асинхронно
         speechSynthesis.addEventListener('voiceschanged', initVoices);
+    } else {
+        console.log('❌ Браузер не поддерживает синтез речи');
     }
     
     const productionDateElem = document.getElementById('productionDate');
@@ -747,10 +717,8 @@ document.addEventListener('DOMContentLoaded', () => {
         checkOnlineStatus();
         showNotification('Подключение к интернету восстановлено', 'success');
         
-        // ОЗВУЧИВАЕМ восстановление связи (только если Алиса доступна)
-        if (voiceUtils.isAliceAvailable()) {
-            voiceUtils.speakSystemEvent('Подключение восстановлено');
-        }
+        // ОЗВУЧИВАЕМ восстановление связи
+        voiceUtils.speakSystemEvent('Подключение восстановлено');
     });
     
     window.addEventListener('offline', () => {
@@ -758,10 +726,8 @@ document.addEventListener('DOMContentLoaded', () => {
         checkOnlineStatus();
         showNotification('Потеряно подключение к интернету. Работаем автономно.', 'warning');
         
-        // ОЗВУЧИВАЕМ потерю связи (только если Алиса доступна)
-        if (voiceUtils.isAliceAvailable()) {
-            voiceUtils.speakSystemEvent('Работаем автономно');
-        }
+        // ОЗВУЧИВАЕМ потерю связи
+        voiceUtils.speakSystemEvent('Работаем автономно');
     });
     
     // Загружаем данные о продуктах
