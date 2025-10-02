@@ -33,8 +33,8 @@ const voiceUtils = {
         return 'speechSynthesis' in window;
     },
     
-    // Озвучить текст с приятными настройками
-    speak: (text, rate = 0.9, pitch = 1.1, volume = 0.8) => {
+    // Озвучить текст с нормальной скоростью
+    speak: (text, rate = 1.0, pitch = 1.0, volume = 0.9) => {
         if (!voiceUtils.isSupported()) {
             console.log('Синтез речи не поддерживается браузером');
             return;
@@ -45,8 +45,8 @@ const voiceUtils = {
         
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ru-RU';
-        utterance.rate = rate;        // Медленная, разборчивая речь
-        utterance.pitch = pitch;      // Приятный тембр
+        utterance.rate = rate;        // Нормальная скорость
+        utterance.pitch = pitch;      // Естественный тембр
         utterance.volume = volume;    // Комфортная громкость
         
         utterance.onstart = () => {
@@ -92,17 +92,17 @@ const voiceUtils = {
                 prefix = '';
         }
         
-        voiceUtils.speak(prefix + message, 0.85, 1.1, 0.9);
+        voiceUtils.speak(prefix + message, 1.0, 1.0, 0.9);
     },
     
     // Озвучить системные события
     speakSystemEvent: (message) => {
-        voiceUtils.speak(message, 0.8, 1.0, 0.85);
+        voiceUtils.speak(message, 1.0, 1.0, 0.85);
     },
     
     // Озвучить события загрузки данных
     speakDataEvent: (message) => {
-        voiceUtils.speak(message, 0.8, 1.05, 0.8);
+        voiceUtils.speak(message, 1.0, 1.0, 0.85);
     }
 };
 
