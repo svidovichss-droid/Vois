@@ -69,7 +69,7 @@ const voiceUtils = {
         
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ru-RU';
-        utterance.rate = rate;        // УВЕЛИЧЕНА СКОРОСТЬ ДО 1.3
+        utterance.rate = rate;        // УВЕЛИЧЕНА СКОРОСТЬ ДО 2.8
         utterance.pitch = pitch;
         utterance.volume = volume;
         
@@ -116,19 +116,19 @@ const voiceUtils = {
                 prefix = '';
         }
         
-        voiceUtils.speak(prefix + message, 1.3); // Быстрая скорость для уведомлений
+        voiceUtils.speak(prefix + message, 2.8); // Быстрая скорость для уведомлений
     },
     
     // Озвучить системные события
     speakSystemEvent: (message) => {
         if (!voiceUtils.isSupported()) return;
-        voiceUtils.speak(message, 1.3); // Быстрая скорость для системных событий
+        voiceUtils.speak(message, 2.8); // Быстрая скорость для системных событий
     },
     
     // Озвучить события загрузки данных
     speakDataEvent: (message) => {
         if (!voiceUtils.isSupported()) return;
-        voiceUtils.speak(message, 1.3); // Быстрая скорость для событий данных
+        voiceUtils.speak(message, 2.8); // Быстрая скорость для событий данных
     },
     
     // Показать доступные голоса
