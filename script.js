@@ -33,8 +33,8 @@ const voiceUtils = {
         return 'speechSynthesis' in window;
     },
     
-    // Озвучить текст
-    speak: (text, rate = 1.0, pitch = 1.0) => {
+    // Озвучить текст с приятными настройками
+    speak: (text, rate = 0.9, pitch = 1.1, volume = 0.8) => {
         if (!voiceUtils.isSupported()) {
             console.log('Синтез речи не поддерживается браузером');
             return;
@@ -45,12 +45,31 @@ const voiceUtils = {
         
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ru-RU';
-        utterance.rate = rate;
-        utterance.pitch = pitch;
+        utterance.rate = rate;        // Медленная, разборчивая речь
+        utterance.pitch = pitch;      // Приятный тембр
+        utterance.volume = volume;    // Комфортная громкость
+        
+        utterance.onstart = () => {
+            console.log('Начато голосовое воспроизведение:', text);
+        };
         
         utterance.onerror = (event) => {
             console.error('Ошибка синтеза речи:', event);
         };
+        
+        utterance.onend = () => {
+            console.log('Завершено голосовое воспроизведение');
+        };
+        
+        // Выбираем приятный голос если доступно
+        const voices = speechSynthesis.getVoices();
+        const russianVoice = voices.find(voice => 
+            voice.lang.includes('ru') && voice.name.includes('female')
+        ) || voices.find(voice => voice.lang.includes('ru'));
+        
+        if (russianVoice) {
+            utterance.voice = russianVoice;
+        }
         
         speechSynthesis.speak(utterance);
     },
@@ -61,24 +80,29 @@ const voiceUtils = {
         
         switch(type) {
             case 'success':
-                prefix = 'Успешно: ';
+                prefix = '✓ ';
                 break;
             case 'warning':
-                prefix = 'Внимание: ';
+                prefix = '⚠ ';
                 break;
             case 'error':
-                prefix = 'Ошибка: ';
+                prefix = '✗ ';
                 break;
             default:
                 prefix = '';
         }
         
-        voiceUtils.speak(prefix + message);
+        voiceUtils.speak(prefix + message, 0.85, 1.1, 0.9);
     },
     
-    // Озвучить важные системные события
+    // Озвучить системные события
     speakSystemEvent: (message) => {
-        voiceUtils.speak(message, 0.9, 1.0);
+        voiceUtils.speak(message, 0.8, 1.0, 0.85);
+    },
+    
+    // Озвучить события загрузки данных
+    speakDataEvent: (message) => {
+        voiceUtils.speak(message, 0.8, 1.05, 0.8);
     }
 };
 
@@ -244,6 +268,11 @@ async function loadProductsData() {
                     console.log('Используем актуальные данные из кэша');
                     processProductsData(cached.data);
                     shouldUseCache = true;
+                    
+                    // ОЗВУЧИВАЕМ использование кэшированных данных
+                    if (voiceUtils.isSupported()) {
+                        voiceUtils.speakDataEvent('Данные загружены из кэша');
+                    }
                 } else {
                     console.log('Обнаружены обновления, загружаем новые данные');
                     shouldUpdateCache = true;
@@ -292,6 +321,11 @@ async function loadProductsData() {
 
         // Загружаем новые данные если нужно
         if (shouldUpdateCache) {
+            // ОЗВУЧИВАЕМ начало загрузки
+            if (voiceUtils.isSupported()) {
+                voiceUtils.speakDataEvent('Загружаем актуальные данные');
+            }
+            
             const response = await fetch(CONFIG.JSON_URL, {
                 cache: 'no-cache'
             });
@@ -311,7 +345,7 @@ async function loadProductsData() {
             
             // ОЗВУЧИВАЕМ успешную загрузку данных
             if (voiceUtils.isSupported()) {
-                voiceUtils.speakSystemEvent('Данные успешно обновлены');
+                voiceUtils.speakDataEvent('Данные успешно обновлены');
             }
             
             // Показываем уведомление об успешной загрузке
@@ -320,17 +354,12 @@ async function loadProductsData() {
             }
         }
 
-        // ОЗВУЧИВАЕМ использование кэшированных данных
-        if (shouldUseCache && isOnline && voiceUtils.isSupported()) {
-            voiceUtils.speakSystemEvent('Данные загружены из кэша');
-        }
-
     } catch (error) {
         console.error('Ошибка загрузки данных:', error);
         
         // ОЗВУЧИВАЕМ ошибку загрузки
         if (voiceUtils.isSupported()) {
-            voiceUtils.speakSystemEvent('Ошибка загрузки данных. Используются резервные данные.');
+            voiceUtils.speakNotification('Не удалось загрузить данные', 'error');
         }
         
         // Пытаемся использовать кэш, даже если он просрочен
@@ -387,6 +416,12 @@ async function forceRefreshData() {
         showNotification('Нет подключения к интернету. Обновление невозможно.', 'error');
         return;
     }
+    
+    // ОЗВУЧИВАЕМ начало принудительного обновления
+    if (voiceUtils.isSupported()) {
+        voiceUtils.speakDataEvent('Обновляем данные');
+    }
+    
     cacheUtils.clearCache();
     await loadProductsData();
 }
@@ -499,11 +534,6 @@ function selectProduct(code) {
         showStandardNotification("Статус: " + product["Название стандарта"]);
     }
     
-    // ОЗВУЧИВАЕМ выбор продукта
-    if (voiceUtils.isSupported()) {
-        voiceUtils.speakSystemEvent(`Выбран продукт: ${product["Полное наименование (русское)"]}. Срок годности ${product["Срок годности"]} дней`);
-    }
-    
     if (!warningMessageAdded) {
         const warningMessage = document.createElement('div');
         warningMessage.id = 'warningMessage';
@@ -566,12 +596,6 @@ function calculateExpiry() {
     resultDiv.classList.remove('hidden');
     resultDiv.classList.add('fade-in');
 
-    // ОЗВУЧИВАЕМ результат расчета
-    if (voiceUtils.isSupported()) {
-        const productName = document.getElementById('productName').value || 'продукта';
-        voiceUtils.speakSystemEvent(`Срок годности ${productName} истекает ${formattedDate}`);
-    }
-
     const warningMsg = document.getElementById('warningMessage');
     if (warningMsg) {
         warningMsg.remove();
@@ -618,6 +642,11 @@ function showNotification(message, type) {
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
+    // Ждем загрузки голосов
+    if (voiceUtils.isSupported()) {
+        speechSynthesis.getVoices(); // Инициализируем голоса
+    }
+    
     const productionDateElem = document.getElementById('productionDate');
     if (productionDateElem) {
         const today = new Date();
@@ -636,7 +665,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // ОЗВУЧИВАЕМ восстановление связи
         if (voiceUtils.isSupported()) {
-            voiceUtils.speakSystemEvent('Подключение к интернету восстановлено');
+            voiceUtils.speakSystemEvent('Подключение восстановлено');
         }
     });
     
@@ -647,7 +676,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // ОЗВУЧИВАЕМ потерю связи
         if (voiceUtils.isSupported()) {
-            voiceUtils.speakSystemEvent('Внимание! Потеряно подключение к интернету. Работаем автономно.');
+            voiceUtils.speakSystemEvent('Работаем автономно');
         }
     });
     
