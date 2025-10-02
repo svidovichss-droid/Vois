@@ -33,35 +33,45 @@ const voiceUtils = {
         return 'speechSynthesis' in window;
     },
     
-    // Получить красивый женский голос
-    getFemaleVoice: () => {
+    // Получить голос Алиса от Яндекса
+    getAliceVoice: () => {
         const voices = speechSynthesis.getVoices();
         
-        // Предпочтительные женские голоса (по порядку приоритета)
-        const preferredVoices = [
-            // Google Russian Female
-            voices.find(voice => voice.lang === 'ru-RU' && voice.name.includes('Google') && voice.name.includes('Female')),
-            // Microsoft Russian Female
-            voices.find(voice => voice.lang === 'ru-RU' && voice.name.includes('Microsoft') && voice.name.includes('Female')),
-            // Yandex Female
-            voices.find(voice => voice.lang === 'ru-RU' && voice.name.includes('Yandex') && voice.name.includes('Female')),
-            // Любой женский русский голос
-            voices.find(voice => voice.lang.includes('ru') && (
-                voice.name.toLowerCase().includes('female') || 
-                voice.name.toLowerCase().includes('женский') ||
-                voice.name.toLowerCase().includes('alena') || // Голос Алена в Edge
-                voice.name.toLowerCase().includes('irina') || // Голос Ирина
-                voice.name.toLowerCase().includes('katya')   // Голос Катя
-            )),
-            // Любой русский голос
+        // Ищем голос Алиса в различных вариантах названий
+        const aliceVoiceNames = [
+            'Alice', 'Алиса', 'Yandex Alice', 'Yandex Алиса',
+            'Russian Alice', 'Russian Алиса', 'Alice Russian',
+            'Google Russian Alice', 'Microsoft Alice'
+        ];
+        
+        const aliceVoice = voices.find(voice => 
+            aliceVoiceNames.some(name => 
+                voice.name.toLowerCase().includes(name.toLowerCase())
+            ) && voice.lang.includes('ru')
+        );
+        
+        if (aliceVoice) {
+            console.log('Найден голос Алиса:', aliceVoice.name);
+            return aliceVoice;
+        }
+        
+        // Если Алису не нашли, ищем любой качественный женский русский голос
+        console.log('Голос Алиса не найден. Ищем альтернативный женский голос...');
+        const fallbackVoices = [
+            voices.find(voice => voice.lang === 'ru-RU' && voice.name.includes('Female')),
+            voices.find(voice => voice.lang === 'ru-RU' && voice.name.includes('Google')),
+            voices.find(voice => voice.lang === 'ru-RU' && voice.name.includes('Microsoft')),
+            voices.find(voice => voice.lang.includes('ru') && voice.name.toLowerCase().includes('female')),
+            voices.find(voice => voice.lang.includes('ru') && voice.name.toLowerCase().includes('alena')),
+            voices.find(voice => voice.lang.includes('ru') && voice.name.toLowerCase().includes('irina')),
             voices.find(voice => voice.lang.includes('ru'))
         ];
         
-        return preferredVoices.find(voice => voice) || null;
+        return fallbackVoices.find(voice => voice) || null;
     },
     
-    // Озвучить текст с красивым женским голосом
-    speak: (text, rate = 1.0, pitch = 1.1, volume = 0.9) => {
+    // Озвучить текст голосом Алиса
+    speak: (text, rate = 1.0, pitch = 1.0, volume = 0.9) => {
         if (!voiceUtils.isSupported()) {
             console.log('Синтез речи не поддерживается браузером');
             return;
@@ -73,18 +83,18 @@ const voiceUtils = {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ru-RU';
         utterance.rate = rate;        // Нормальная скорость
-        utterance.pitch = pitch;      // Более высокий тембр для женского голоса
+        utterance.pitch = pitch;      // Естественный тембр
         utterance.volume = volume;    // Комфортная громкость
         
-        // Устанавливаем красивый женский голос
-        const femaleVoice = voiceUtils.getFemaleVoice();
-        if (femaleVoice) {
-            utterance.voice = femaleVoice;
-            console.log('Используем голос:', femaleVoice.name);
+        // Устанавливаем голос Алиса
+        const aliceVoice = voiceUtils.getAliceVoice();
+        if (aliceVoice) {
+            utterance.voice = aliceVoice;
+            console.log('Используем голос:', aliceVoice.name);
         }
         
         utterance.onstart = () => {
-            console.log('Начато голосовое воспроизведение:', text);
+            console.log('Алиса начала говорить:', text);
         };
         
         utterance.onerror = (event) => {
@@ -92,7 +102,7 @@ const voiceUtils = {
         };
         
         utterance.onend = () => {
-            console.log('Завершено голосовое воспроизведение');
+            console.log('Алиса завершила речь');
         };
         
         speechSynthesis.speak(utterance);
@@ -116,17 +126,28 @@ const voiceUtils = {
                 prefix = '';
         }
         
-        voiceUtils.speak(prefix + message, 1.0, 1.1, 0.9);
+        voiceUtils.speak(prefix + message, 1.0, 1.0, 0.9);
     },
     
     // Озвучить системные события
     speakSystemEvent: (message) => {
-        voiceUtils.speak(message, 1.0, 1.1, 0.85);
+        voiceUtils.speak(message, 1.0, 1.0, 0.85);
     },
     
     // Озвучить события загрузки данных
     speakDataEvent: (message) => {
-        voiceUtils.speak(message, 1.0, 1.1, 0.85);
+        voiceUtils.speak(message, 1.0, 1.0, 0.85);
+    },
+    
+    // Проверить доступные голоса
+    listAvailableVoices: () => {
+        if (!voiceUtils.isSupported()) return;
+        
+        const voices = speechSynthesis.getVoices();
+        console.log('Доступные голоса:');
+        voices.forEach(voice => {
+            console.log(`- ${voice.name} (${voice.lang}) ${voice.default ? '[по умолчанию]' : ''}`);
+        });
     }
 };
 
@@ -633,7 +654,7 @@ function calculateExpiry() {
 
 // Показать уведомление
 function showNotification(message, type) {
-    // ОЗВУЧИВАЕМ уведомление
+    // ОЗВУЧИВАЕМ уведомление голосом Алисы
     if (voiceUtils.isSupported()) {
         voiceUtils.speakNotification(message, type);
     }
@@ -672,19 +693,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const initVoices = () => {
             const voices = speechSynthesis.getVoices();
             if (voices.length > 0) {
-                console.log('Доступные голоса:', voices.map(v => v.name));
-                const femaleVoice = voiceUtils.getFemaleVoice();
-                if (femaleVoice) {
-                    console.log('Выбран женский голос:', femaleVoice.name);
+                console.log('Доступные голоса:');
+                voices.forEach(voice => {
+                    console.log(`- ${voice.name} (${voice.lang}) ${voice.default ? '[по умолчанию]' : ''}`);
+                });
+                
+                const aliceVoice = voiceUtils.getAliceVoice();
+                if (aliceVoice) {
+                    console.log('🎵 Выбран голос Алиса:', aliceVoice.name);
                 } else {
-                    console.log('Женский голос не найден, будет использован стандартный');
+                    console.log('⚠ Голос Алиса не найден, будет использован альтернативный голос');
                 }
+                
+                // Показываем доступные голоса для отладки
+                voiceUtils.listAvailableVoices();
             } else {
                 setTimeout(initVoices, 100);
             }
         };
         
+        // Запускаем инициализацию голосов
         initVoices();
+        
+        // Некоторые браузеры загружают голоса асинхронно
+        speechSynthesis.addEventListener('voiceschanged', initVoices);
     }
     
     const productionDateElem = document.getElementById('productionDate');
