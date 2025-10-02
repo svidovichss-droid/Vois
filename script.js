@@ -58,7 +58,7 @@ const voiceUtils = {
     },
     
     // Озвучить текст (увеличена скорость)
-    speak: (text, rate = 2.8, pitch = 1.0, volume = 0.8) => {
+    speak: (text, rate = 1.8, pitch = 1.0, volume = 0.8) => {
         if (!voiceUtils.isSupported()) {
             console.log('Синтез речи не поддерживается браузером');
             return;
@@ -116,19 +116,19 @@ const voiceUtils = {
                 prefix = '';
         }
         
-        voiceUtils.speak(prefix + message, 2.8); // Быстрая скорость для уведомлений
+        voiceUtils.speak(prefix + message, 1.8); // Быстрая скорость для уведомлений
     },
     
     // Озвучить системные события
     speakSystemEvent: (message) => {
         if (!voiceUtils.isSupported()) return;
-        voiceUtils.speak(message, 2.8); // Быстрая скорость для системных событий
+        voiceUtils.speak(message, 1.8); // Быстрая скорость для системных событий
     },
     
     // Озвучить события загрузки данных
     speakDataEvent: (message) => {
         if (!voiceUtils.isSupported()) return;
-        voiceUtils.speak(message, 2.8); // Быстрая скорость для событий данных
+        voiceUtils.speak(message, 1.8); // Быстрая скорость для событий данных
     },
     
     // Показать доступные голоса
