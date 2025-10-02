@@ -58,7 +58,7 @@ const voiceUtils = {
     },
     
     // Озвучить текст (увеличена скорость)
-    speak: (text, rate = 1.3, pitch = 1.0, volume = 0.8) => {
+    speak: (text, rate = 1.8, pitch = 1.0, volume = 0.8) => {
         if (!voiceUtils.isSupported()) {
             console.log('Синтез речи не поддерживается браузером');
             return;
