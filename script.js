@@ -33,8 +33,35 @@ const voiceUtils = {
         return 'speechSynthesis' in window;
     },
     
-    // Озвучить текст с нормальной скоростью
-    speak: (text, rate = 1.0, pitch = 1.0, volume = 0.9) => {
+    // Получить красивый женский голос
+    getFemaleVoice: () => {
+        const voices = speechSynthesis.getVoices();
+        
+        // Предпочтительные женские голоса (по порядку приоритета)
+        const preferredVoices = [
+            // Google Russian Female
+            voices.find(voice => voice.lang === 'ru-RU' && voice.name.includes('Google') && voice.name.includes('Female')),
+            // Microsoft Russian Female
+            voices.find(voice => voice.lang === 'ru-RU' && voice.name.includes('Microsoft') && voice.name.includes('Female')),
+            // Yandex Female
+            voices.find(voice => voice.lang === 'ru-RU' && voice.name.includes('Yandex') && voice.name.includes('Female')),
+            // Любой женский русский голос
+            voices.find(voice => voice.lang.includes('ru') && (
+                voice.name.toLowerCase().includes('female') || 
+                voice.name.toLowerCase().includes('женский') ||
+                voice.name.toLowerCase().includes('alena') || // Голос Алена в Edge
+                voice.name.toLowerCase().includes('irina') || // Голос Ирина
+                voice.name.toLowerCase().includes('katya')   // Голос Катя
+            )),
+            // Любой русский голос
+            voices.find(voice => voice.lang.includes('ru'))
+        ];
+        
+        return preferredVoices.find(voice => voice) || null;
+    },
+    
+    // Озвучить текст с красивым женским голосом
+    speak: (text, rate = 1.0, pitch = 1.1, volume = 0.9) => {
         if (!voiceUtils.isSupported()) {
             console.log('Синтез речи не поддерживается браузером');
             return;
@@ -46,8 +73,15 @@ const voiceUtils = {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ru-RU';
         utterance.rate = rate;        // Нормальная скорость
-        utterance.pitch = pitch;      // Естественный тембр
+        utterance.pitch = pitch;      // Более высокий тембр для женского голоса
         utterance.volume = volume;    // Комфортная громкость
+        
+        // Устанавливаем красивый женский голос
+        const femaleVoice = voiceUtils.getFemaleVoice();
+        if (femaleVoice) {
+            utterance.voice = femaleVoice;
+            console.log('Используем голос:', femaleVoice.name);
+        }
         
         utterance.onstart = () => {
             console.log('Начато голосовое воспроизведение:', text);
@@ -61,16 +95,6 @@ const voiceUtils = {
             console.log('Завершено голосовое воспроизведение');
         };
         
-        // Выбираем приятный голос если доступно
-        const voices = speechSynthesis.getVoices();
-        const russianVoice = voices.find(voice => 
-            voice.lang.includes('ru') && voice.name.includes('female')
-        ) || voices.find(voice => voice.lang.includes('ru'));
-        
-        if (russianVoice) {
-            utterance.voice = russianVoice;
-        }
-        
         speechSynthesis.speak(utterance);
     },
     
@@ -80,29 +104,29 @@ const voiceUtils = {
         
         switch(type) {
             case 'success':
-                prefix = '✓ ';
+                prefix = '';
                 break;
             case 'warning':
-                prefix = '⚠ ';
+                prefix = 'Внимание: ';
                 break;
             case 'error':
-                prefix = '✗ ';
+                prefix = 'Ошибка: ';
                 break;
             default:
                 prefix = '';
         }
         
-        voiceUtils.speak(prefix + message, 1.0, 1.0, 0.9);
+        voiceUtils.speak(prefix + message, 1.0, 1.1, 0.9);
     },
     
     // Озвучить системные события
     speakSystemEvent: (message) => {
-        voiceUtils.speak(message, 1.0, 1.0, 0.85);
+        voiceUtils.speak(message, 1.0, 1.1, 0.85);
     },
     
     // Озвучить события загрузки данных
     speakDataEvent: (message) => {
-        voiceUtils.speak(message, 1.0, 1.0, 0.85);
+        voiceUtils.speak(message, 1.0, 1.1, 0.85);
     }
 };
 
@@ -642,9 +666,25 @@ function showNotification(message, type) {
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
-    // Ждем загрузки голосов
+    // Инициализируем голоса
     if (voiceUtils.isSupported()) {
-        speechSynthesis.getVoices(); // Инициализируем голоса
+        // Ждем загрузки голосов
+        const initVoices = () => {
+            const voices = speechSynthesis.getVoices();
+            if (voices.length > 0) {
+                console.log('Доступные голоса:', voices.map(v => v.name));
+                const femaleVoice = voiceUtils.getFemaleVoice();
+                if (femaleVoice) {
+                    console.log('Выбран женский голос:', femaleVoice.name);
+                } else {
+                    console.log('Женский голос не найден, будет использован стандартный');
+                }
+            } else {
+                setTimeout(initVoices, 100);
+            }
+        };
+        
+        initVoices();
     }
     
     const productionDateElem = document.getElementById('productionDate');
