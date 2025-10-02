@@ -33,7 +33,7 @@ const voiceUtils = {
         return 'speechSynthesis' in window;
     },
     
-    // Получить любой доступный русский голос (временно)
+    // Получить любой доступный русский голос
     getAvailableVoice: () => {
         const voices = speechSynthesis.getVoices();
         
@@ -57,8 +57,8 @@ const voiceUtils = {
         return null;
     },
     
-    // Озвучить текст
-    speak: (text, rate = 1.0, pitch = 1.0, volume = 0.8) => {
+    // Озвучить текст (увеличена скорость)
+    speak: (text, rate = 1.3, pitch = 1.0, volume = 0.8) => {
         if (!voiceUtils.isSupported()) {
             console.log('Синтез речи не поддерживается браузером');
             return;
@@ -69,7 +69,7 @@ const voiceUtils = {
         
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ru-RU';
-        utterance.rate = rate;
+        utterance.rate = rate;        // УВЕЛИЧЕНА СКОРОСТЬ ДО 1.3
         utterance.pitch = pitch;
         utterance.volume = volume;
         
@@ -104,7 +104,7 @@ const voiceUtils = {
         let prefix = '';
         switch(type) {
             case 'success':
-                prefix = 'Успешно: ';
+                prefix = '';
                 break;
             case 'warning':
                 prefix = 'Внимание: ';
@@ -116,19 +116,19 @@ const voiceUtils = {
                 prefix = '';
         }
         
-        voiceUtils.speak(prefix + message);
+        voiceUtils.speak(prefix + message, 1.3); // Быстрая скорость для уведомлений
     },
     
     // Озвучить системные события
     speakSystemEvent: (message) => {
         if (!voiceUtils.isSupported()) return;
-        voiceUtils.speak(message);
+        voiceUtils.speak(message, 1.3); // Быстрая скорость для системных событий
     },
     
     // Озвучить события загрузки данных
     speakDataEvent: (message) => {
         if (!voiceUtils.isSupported()) return;
-        voiceUtils.speak(message);
+        voiceUtils.speak(message, 1.3); // Быстрая скорость для событий данных
     },
     
     // Показать доступные голоса
@@ -276,7 +276,7 @@ async function checkForUpdates(cachedEtag) {
             const newEtag = response.headers.get('ETag');
             if (newEtag && newEtag !== cachedEtag) {
                 console.log('Обнаружены обновления на сервере');
-                return true; // Есть обновления
+                return true; // Есть обновлений
             }
         }
 
@@ -683,10 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('🔊 Инициализация голосового синтеза:');
                 voiceUtils.showAvailableVoices();
                 
-                // Тестируем голос
-                setTimeout(() => {
-                    voiceUtils.speak('Голосовое сопровождение активировано');
-                }, 1000);
+                // УБРАНА ТЕСТОВАЯ ФРАЗА
             } else {
                 setTimeout(initVoices, 100);
             }
