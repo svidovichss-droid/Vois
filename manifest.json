@@ -1,19 +1,25 @@
 {
-  "name": "Калькулятор срока годности",
-  "short_name": "Калькулятор",
-  "description": "Приложение для расчета срока годности продукции",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#2c3e50",
-  "theme_color": "#3498db",
-  "orientation": "portrait",
-  "icons": [
-    {
-      "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMzNDk4REIiLz4KPHBhdGggZD0iTTE2IDI0TDM0IDQwTDUwIDE4IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8L3N2Zz4K",
-      "sizes": "64x64",
-      "type": "image/svg+xml"
-    }
-  ],
-  "categories": ["productivity", "utilities"],
-  "lang": "ru-RU"
+    "name": "Калькулятор срока годности",
+    "short_name": "СрокГодности",
+    "description": "Приложение для расчета даты окончания срока годности продукции",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#2c3e50",
+    "theme_color": "#3498db",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgdmlld0JveD0iMCAwIDE5MiAxOTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiByeD0iMjQiIGZpbGw9IiMzNDk4ZGIiLz4KPHBhdGggZD0iTTk2IDQ4QzExMi44IDQ4IDEyOCA1My40IDE0MCA2Mi40TDE0MCA5NkMxNDAgMTEyLjggMTM0LjYgMTI4IDEyNS42IDE0MEMxMTYuNiAxNTIgMTAxLjQgMTYwIDg0LjYgMTYwQzY3LjggMTYwIDUyLjYgMTUyIDQzLjYgMTQwQzM0LjYgMTI4IDI5LjIgMTEyLjggMjkuMiA5NkwyOS4yIDYyLjRDNDEuMiA1My40IDU2LjQgNDggNzMuMiA0OEg5NloiIGZpbGw9IndoaXRlIi8+CjxjaXJjbGUgY3g9Ijk2IiBjeT0iOTYiIHI9IjI0IiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K",
+            "sizes": "192x192",
+            "type": "image/svg+xml"
+        },
+        {
+            "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiByeD0iNjQiIGZpbGw9IiMzNDk4ZGIiLz4KPHBhdGggZD0iTTI1NiAxMjhDMzAwLjggMTI4IDM0NCAxNDIuNCAzNzIgMTY2LjRMMzcyIDI1NkMzNzIgMzAwLjggMzU3LjYgMzQ0IDMzMy42IDM3MkMzMDkuNiA0MDAgMjY2LjQgNDE2IDIyMS42IDQxNkMxNzYuOCA0MTYgMTMzLjYgNDAwIDEwOS42IDM3MkM4NS42IDM0NCA3MS4yIDMwMC44IDcxLjIgMjU2TDcxLjIgMTY2LjRDOTkuMiAxNDIuNCAxNDIuNCAxMjggMTg3LjIgMTI4SDI1NloiIGZpbGw9IndoaXRlIi8+CjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iNjQiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=",
+            "sizes": "512x512", 
+            "type": "image/svg+xml"
+        }
+    ],
+    "categories": ["productivity", "utilities"],
+    "lang": "ru-RU",
+    "scope": "/"
 }
