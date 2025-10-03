@@ -1,35 +1,34 @@
-const CACHE_NAME = 'progress-calculator-v2.4';
-const CACHE_URLS = [
+const CACHE_NAME = 'progress-calculator-v1';
+const urlsToCache = [
     '/',
     '/index.html',
-    '/script.js',
-    '/styles.css',
-    '/manifest.json'
+    '/deepseek_css_20251002_f47ae2.css',
+    '/deepseek_javascript_20251002_cc11c3.js'
 ];
 
 // Установка Service Worker
-self.addEventListener('install', (event) => {
+self.addEventListener('install', function(event) {
     console.log('Service Worker: Установка');
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then((cache) => {
+            .then(function(cache) {
                 console.log('Service Worker: Кэширование файлов');
-                return cache.addAll(CACHE_URLS);
+                return cache.addAll(urlsToCache);
             })
             .then(() => self.skipWaiting())
     );
 });
 
 // Активация Service Worker
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', function(event) {
     console.log('Service Worker: Активация');
     event.waitUntil(
-        caches.keys().then((cacheNames) => {
+        caches.keys().then(function(cacheNames) {
             return Promise.all(
-                cacheNames.map((cache) => {
-                    if (cache !== CACHE_NAME) {
-                        console.log('Service Worker: Очистка старого кэша');
-                        return caches.delete(cache);
+                cacheNames.map(function(cacheName) {
+                    if (cacheName !== CACHE_NAME) {
+                        console.log('Service Worker: Удаление старого кэша', cacheName);
+                        return caches.delete(cacheName);
                     }
                 })
             );
@@ -38,51 +37,23 @@ self.addEventListener('activate', (event) => {
 });
 
 // Перехват запросов
-self.addEventListener('fetch', (event) => {
-    // Игнорируем запросы к Google Analytics и другим внешним сервисам
-    if (event.request.url.includes('google-analytics') || 
-        event.request.url.includes('gtag')) {
-        return;
-    }
-
-    // Для JSON данных используем стратегию "Сначала сеть, потом кэш"
+self.addEventListener('fetch', function(event) {
+    // Для данных используем стратегию "Сначала сеть, потом кэш"
     if (event.request.url.includes('data.json')) {
         event.respondWith(
             fetch(event.request)
-                .then((response) => {
-                    // Клонируем ответ, так как он может быть использован только один раз
+                .then(function(response) {
+                    // Сохраняем в кэш
                     const responseClone = response.clone();
-                    
-                    // Сохраняем свежие данные в кэш
                     caches.open(CACHE_NAME)
-                        .then((cache) => {
+                        .then(function(cache) {
                             cache.put(event.request, responseClone);
                         });
-                    
                     return response;
                 })
-                .catch(() => {
-                    // Если сеть недоступна, используем кэшированные данные
-                    return caches.match(event.request)
-                        .then((cachedResponse) => {
-                            if (cachedResponse) {
-                                return cachedResponse;
-                            }
-                            // Если нет кэшированных данных, возвращаем fallback
-                            return new Response(JSON.stringify([
-                                {
-                                    "Код продукции": "000001",
-                                    "Полное наименование (русское)": "Тестовый продукт 1",
-                                    "Срок годности": 365,
-                                    "Штук в упаковке": 10,
-                                    "Штрихкод упаковки": "1234567890123",
-                                    "Производитель": "Тестовый производитель",
-                                    "Название стандарта": "ГОСТ 12345-2020"
-                                }
-                            ]), {
-                                headers: { 'Content-Type': 'application/json' }
-                            });
-                        });
+                .catch(function() {
+                    // Если сеть недоступна, используем кэш
+                    return caches.match(event.request);
                 })
         );
         return;
@@ -91,25 +62,8 @@ self.addEventListener('fetch', (event) => {
     // Для остальных файлов используем стратегию "Сначала кэш, потом сеть"
     event.respondWith(
         caches.match(event.request)
-            .then((response) => {
-                // Возвращаем кэшированную версию или делаем запрос к сети
+            .then(function(response) {
                 return response || fetch(event.request);
             })
     );
-});
-
-// Фоновая синхронизация
-self.addEventListener('sync', (event) => {
-    if (event.tag === 'background-sync') {
-        console.log('Service Worker: Фоновая синхронизация');
-        // Здесь можно добавить логику для фоновой синхронизации данных
-    }
-});
-
-// Периодическая синхронизация (если поддерживается)
-self.addEventListener('periodicsync', (event) => {
-    if (event.tag === 'periodic-data-update') {
-        console.log('Service Worker: Периодическое обновление данных');
-        // Обновление данных в фоновом режиме
-    }
 });
