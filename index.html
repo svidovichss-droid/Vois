@@ -7,7 +7,7 @@
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="deepseek_css_20251002_f47ae2.css">
 </head>
 <body>
 <div class="header">
@@ -61,7 +61,7 @@
                         <input
                            type="text"
                            id="productSearch"
-                           placeholder="Введите код или название продукта..."
+                           placeholder="Загрузка данных..."
                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                            aria-label="Поиск продукта по коду или названию"
                            disabled
@@ -72,7 +72,7 @@
                     </div>
                 </div>
                 
-                <!-- Standard notification container (now placed next to search) -->
+                <!-- Standard notification container -->
                 <div id="standardNotificationContainer" class="md:mt-8 w-full md:w-64"></div>
             </div>
 
@@ -88,6 +88,7 @@
                        readonly
                        class="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed"
                        aria-readonly="true"
+                       placeholder="Выберите продукт"
                     >
                 </div>
 
@@ -101,6 +102,7 @@
                        readonly
                        class="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed"
                        aria-readonly="true"
+                       placeholder="Выберите продукт"
                     >
                 </div>
 
@@ -115,6 +117,7 @@
                            readonly
                            class="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed pr-12"
                            aria-readonly="true"
+                           placeholder="0"
                         >
                         <span class="absolute right-3 top-3 text-gray-500">дней</span>
                     </div>
@@ -131,6 +134,7 @@
                        readonly
                        class="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed"
                        aria-readonly="true"
+                       placeholder="0"
                     >
                 </div>
 
@@ -144,6 +148,7 @@
                        readonly
                        class="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed"
                        aria-readonly="true"
+                       placeholder="Не указан"
                     >
                 </div>
 
@@ -157,6 +162,7 @@
                        readonly
                        class="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed"
                        aria-readonly="true"
+                       placeholder="Не указан"
                     >
                 </div>
             </div>
@@ -177,7 +183,7 @@
             <!-- Calculate button -->
             <button
                onclick="calculateExpiry()"
-               class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-4 rounded-lg transition-all duration-300 shadow-md"
+               class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-4 rounded-lg transition-all duration-300 shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed"
                aria-label="Рассчитать срок годности"
                id="calculateButton"
                disabled
@@ -217,6 +223,21 @@
     </div>
 </div>
 
-<script src="script.js"></script>
+<script src="deepseek_javascript_20251002_cc11c3.js"></script>
+
+<script>
+    // Регистрация Service Worker
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(function(registration) {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                })
+                .catch(function(error) {
+                    console.log('ServiceWorker registration failed: ', error);
+                });
+        });
+    }
+</script>
 </body>
 </html>
