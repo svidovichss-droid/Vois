@@ -1,12 +1,10 @@
-const CACHE_NAME = 'progress-calculator-v2.3';
+const CACHE_NAME = 'progress-calculator-v2.4';
 const CACHE_URLS = [
     '/',
     '/index.html',
     '/script.js',
     '/styles.css',
-    'https://cdn.tailwindcss.com',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-    'https://raw.githubusercontent.com/svidovichss-droid/ProgressSAP.github.io/main/data.json'
+    '/manifest.json'
 ];
 
 // Установка Service Worker
