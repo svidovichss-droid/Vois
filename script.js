@@ -1,9 +1,13 @@
 // Конфигурация приложения
 const CONFIG = {
     JSON_URL: 'https://raw.githubusercontent.com/svidovichss-droid/ProgressSAP.github.io/main/data.json',
-    CACHE_KEY: 'products_cache',
+    CACHE_KEY: 'products_cache_v2',
     ETAG_KEY: 'products_etag',
-    CACHE_EXPIRY: 24 * 60 * 60 * 1000, // 24 часа в миллисекундах
+    DATA_SCHEMA_VERSION: '2.0',
+    CACHE_EXPIRY: 24 * 60 * 60 * 1000,
+    BACKGROUND_SYNC_INTERVAL: 30 * 60 * 1000,
+    CHUNK_SIZE: 1000,
+    MAX_JSON_SIZE: 10 * 1024 * 1024,
     FALLBACK_DATA: [
         {
             "Код продукции": "000001",
@@ -15,145 +19,24 @@ const CONFIG = {
             "Название стандарта": "ГОСТ 12345-2020"
         },
         {
-            "Код продукции": "000002",
+            "Код продукции": "000002", 
             "Полное наименование (русское)": "Тестовый продукт 2",
             "Срок годности": 180,
             "Штук в упаковке": 5,
-            "Штрихкод упаковки": "9876543210987",
-            "Производитель": "Другой производитель",
-            "Название стандарта": "ТУ 45678-2021"
+            "Штрихкод упаковки": "1234567890124",
+            "Производитель": "Тестовый производитель 2",
+            "Название стандарта": "ГОСТ 12346-2020"
         }
     ]
 };
 
-// Функции для голосового озвучивания
-const voiceUtils = {
-    // Проверка поддержки синтеза речи
-    isSupported: () => {
-        return 'speechSynthesis' in window;
-    },
-    
-    // Получить любой доступный русский голос
-    getAvailableVoice: () => {
-        const voices = speechSynthesis.getVoices();
-        
-        // Сначала ищем любой русский голос
-        const russianVoice = voices.find(voice => 
-            voice.lang.includes('ru') || voice.lang.includes('RU')
-        );
-        
-        if (russianVoice) {
-            console.log('✅ Используем голос:', russianVoice.name);
-            return russianVoice;
-        }
-        
-        // Если нет русского, используем первый доступный
-        if (voices.length > 0) {
-            console.log('⚠ Русский голос не найден, используем:', voices[0].name);
-            return voices[0];
-        }
-        
-        console.log('❌ Голоса не найдены');
-        return null;
-    },
-    
-    // Озвучить текст (увеличена скорость)
-    speak: (text, rate = 1.5, pitch = 1.0, volume = 0.8) => {
-        if (!voiceUtils.isSupported()) {
-            console.log('Синтез речи не поддерживается браузером');
-            return;
-        }
-        
-        // Останавливаем текущее воспроизведение
-        speechSynthesis.cancel();
-        
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ru-RU';
-        utterance.rate = rate;        // УВЕЛИЧЕНА СКОРОСТЬ ДО 1.5
-        utterance.pitch = pitch;
-        utterance.volume = volume;
-        
-        // Устанавливаем доступный голос
-        const availableVoice = voiceUtils.getAvailableVoice();
-        if (availableVoice) {
-            utterance.voice = availableVoice;
-        } else {
-            console.log('❌ Нет доступных голосов');
-            return;
-        }
-        
-        utterance.onstart = () => {
-            console.log('🔊 Начато озвучивание:', text);
-        };
-        
-        utterance.onerror = (event) => {
-            console.error('Ошибка синтеза речи:', event);
-        };
-        
-        utterance.onend = () => {
-            console.log('✅ Озвучивание завершено');
-        };
-        
-        speechSynthesis.speak(utterance);
-    },
-    
-    // Озвучить уведомление
-    speakNotification: (message, type) => {
-        if (!voiceUtils.isSupported()) return;
-        
-        let prefix = '';
-        switch(type) {
-            case 'success':
-                prefix = '';
-                break;
-            case 'warning':
-                prefix = 'Внимание: ';
-                break;
-            case 'error':
-                prefix = 'Ошибка: ';
-                break;
-            default:
-                prefix = '';
-        }
-        
-        voiceUtils.speak(prefix + message, 1.5); // Быстрая скорость для уведомлений
-    },
-    
-    // Озвучить системные события
-    speakSystemEvent: (message) => {
-        if (!voiceUtils.isSupported()) return;
-        voiceUtils.speak(message, 1.5); // Быстрая скорость для системных событий
-    },
-    
-    // Озвучить события загрузки данных
-    speakDataEvent: (message) => {
-        if (!voiceUtils.isSupported()) return;
-        voiceUtils.speak(message, 1.5); // Быстрая скорость для событий данных
-    },
-    
-    // Показать доступные голоса
-    showAvailableVoices: () => {
-        if (!voiceUtils.isSupported()) {
-            console.log('❌ Синтез речи не поддерживается');
-            return;
-        }
-        
-        const voices = speechSynthesis.getVoices();
-        console.log('🎵 Доступные голоса:');
-        voices.forEach(voice => {
-            console.log(`- ${voice.name} (${voice.lang}) ${voice.default ? '[по умолчанию]' : ''}`);
-        });
-        
-        if (voices.length === 0) {
-            console.log('❌ Голосов не найдено. Проверьте настройки браузера.');
-        }
-    }
-};
-
 // Глобальные переменные
 let products = {};
+let productsArray = [];
 let warningMessageAdded = false;
 let isOnline = true;
+let backgroundSyncTimer = null;
+let searchWorker = null;
 
 // DOM elements
 const productSearch = document.getElementById('productSearch');
@@ -162,6 +45,90 @@ const standardNotificationContainer = document.getElementById('standardNotificat
 const dataStatus = document.getElementById('dataStatus');
 const offlineStatus = document.getElementById('offlineStatus');
 const calculateButton = document.getElementById('calculateButton');
+
+// Web Worker для обработки больших данных
+function initSearchWorker() {
+    if (window.Worker) {
+        try {
+            searchWorker = new Worker(URL.createObjectURL(new Blob([`
+                let productsData = [];
+                
+                self.addEventListener('message', function(e) {
+                    const { type, data } = e.data;
+                    
+                    if (type === 'SET_DATA') {
+                        productsData = data;
+                        self.postMessage({ type: 'DATA_READY' });
+                    }
+                    
+                    if (type === 'SEARCH') {
+                        const { searchTerm, maxResults = 50 } = data;
+                        const results = [];
+                        
+                        for (let i = 0; i < Math.min(productsData.length, 10000); i++) {
+                            const product = productsData[i];
+                            if (product.code.includes(searchTerm) ||
+                                product.name.toLowerCase().includes(searchTerm)) {
+                                results.push({
+                                    code: product.code,
+                                    name: product.name,
+                                    shelfLife: product.shelfLife
+                                });
+                                
+                                if (results.length >= maxResults) break;
+                            }
+                        }
+                        
+                        self.postMessage({ 
+                            type: 'SEARCH_RESULTS', 
+                            data: results 
+                        });
+                    }
+                });
+            `], { type: 'application/javascript' })));
+
+            // Обработчик сообщений от Worker
+            searchWorker.addEventListener('message', function(e) {
+                const { type, data } = e.data;
+                
+                if (type === 'SEARCH_RESULTS') {
+                    handleSearchResults(data);
+                }
+                
+                if (type === 'DATA_READY') {
+                    console.log('Worker готов к поиску');
+                }
+            });
+
+            searchWorker.addEventListener('error', function(error) {
+                console.error('Ошибка в Worker:', error);
+            });
+        } catch (error) {
+            console.error('Не удалось инициализировать Worker:', error);
+        }
+    }
+}
+
+// Обработка результатов поиска из Worker
+function handleSearchResults(results) {
+    if (!searchResults) return;
+    
+    searchResults.innerHTML = '';
+    
+    if (results.length === 0) {
+        showNoResults();
+        return;
+    }
+    
+    results.forEach(result => {
+        addSearchResult(result.code, {
+            "Полное наименование (русское)": result.name,
+            "Срок годности": result.shelfLife
+        });
+    });
+    
+    searchResults.classList.remove('hidden');
+}
 
 // Проверка онлайн статуса
 function checkOnlineStatus() {
@@ -174,15 +141,74 @@ function checkOnlineStatus() {
     return isOnline;
 }
 
+// Валидация структуры данных
+const dataValidator = {
+    requiredFields: ['Код продукции', 'Полное наименование (русское)', 'Срок годности'],
+    
+    validateProduct: (product) => {
+        for (const field of dataValidator.requiredFields) {
+            if (!(field in product)) {
+                console.warn(`Отсутствует обязательное поле: ${field}`, product);
+                return false;
+            }
+        }
+        
+        if (typeof product["Код продукции"] !== 'string') {
+            console.warn('Неверный тип для Код продукции', product);
+            return false;
+        }
+        
+        const shelfLife = parseInt(product["Срок годности"]);
+        if (isNaN(shelfLife) || shelfLife <= 0) {
+            console.warn('Неверный срок годности', product);
+            return false;
+        }
+        
+        return true;
+    },
+    
+    validateSchema: (data) => {
+        if (!Array.isArray(data)) {
+            throw new Error('Данные должны быть массивом');
+        }
+        
+        if (data.length === 0) {
+            throw new Error('Массив данных пуст');
+        }
+        
+        const validProducts = [];
+        let invalidCount = 0;
+        
+        for (const product of data) {
+            if (dataValidator.validateProduct(product)) {
+                validProducts.push(product);
+            } else {
+                invalidCount++;
+            }
+        }
+        
+        if (invalidCount > 0) {
+            console.warn(`Найдено ${invalidCount} некорректных записей`);
+        }
+        
+        if (validProducts.length === 0) {
+            throw new Error('Нет валидных данных');
+        }
+        
+        return validProducts;
+    }
+};
+
 // Утилиты для работы с кэшем
 const cacheUtils = {
-    // Сохранить данные в кэш
     saveToCache: (data, etag = null) => {
         try {
             const cacheData = {
                 timestamp: Date.now(),
                 data: data,
-                etag: etag
+                etag: etag,
+                schemaVersion: CONFIG.DATA_SCHEMA_VERSION,
+                dataHash: cacheUtils.generateDataHash(data)
             };
             localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify(cacheData));
             console.log('Данные сохранены в кэш');
@@ -190,32 +216,94 @@ const cacheUtils = {
             if (etag) {
                 localStorage.setItem(CONFIG.ETAG_KEY, etag);
             }
+            
+            if (searchWorker) {
+                const workerData = data.map(product => ({
+                    code: product["Код продукции"],
+                    name: product["Полное наименование (русское)"],
+                    shelfLife: product["Срок годности"]
+                }));
+                searchWorker.postMessage({ 
+                    type: 'SET_DATA', 
+                    data: workerData 
+                });
+            }
         } catch (error) {
             console.error('Ошибка сохранения в кэш:', error);
+            if (error.name === 'QuotaExceededError') {
+                cacheUtils.clearOldCache();
+                cacheUtils.saveToCache(data, etag);
+            }
         }
     },
 
-    // Получить данные из кэша
+    generateDataHash: (data) => {
+        const jsonString = JSON.stringify(data);
+        let hash = 0;
+        for (let i = 0; i < jsonString.length; i++) {
+            const char = jsonString.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        return hash.toString(36);
+    },
+
     getFromCache: () => {
         try {
             const cached = localStorage.getItem(CONFIG.CACHE_KEY);
             if (!cached) return null;
 
             const cacheData = JSON.parse(cached);
+            
+            if (cacheData.schemaVersion !== CONFIG.DATA_SCHEMA_VERSION) {
+                console.log('Инвалидация кэша: изменилась версия схемы');
+                cacheUtils.clearCache();
+                return null;
+            }
+            
+            const currentHash = cacheUtils.generateDataHash(cacheData.data);
+            if (cacheData.dataHash !== currentHash) {
+                console.log('Инвалидация кэша: данные повреждены');
+                cacheUtils.clearCache();
+                return null;
+            }
+
             const isExpired = Date.now() - cacheData.timestamp > CONFIG.CACHE_EXPIRY;
 
             return {
                 data: cacheData.data,
                 etag: cacheData.etag,
-                isExpired: isExpired
+                isExpired: isExpired,
+                timestamp: cacheData.timestamp
             };
         } catch (error) {
             console.error('Ошибка чтения из кэша:', error);
+            cacheUtils.clearCache();
             return null;
         }
     },
 
-    // Получить ETag из localStorage
+    clearOldCache: () => {
+        try {
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('products_cache')) {
+                    keysToRemove.push(key);
+                }
+            }
+            
+            keysToRemove.forEach(key => {
+                if (key !== CONFIG.CACHE_KEY) {
+                    localStorage.removeItem(key);
+                }
+            });
+            console.log('Очищены старые версии кэша');
+        } catch (error) {
+            console.error('Ошибка очистки старых кэшей:', error);
+        }
+    },
+
     getEtag: () => {
         try {
             return localStorage.getItem(CONFIG.ETAG_KEY);
@@ -225,7 +313,6 @@ const cacheUtils = {
         }
     },
 
-    // Очистить кэш
     clearCache: () => {
         try {
             localStorage.removeItem(CONFIG.CACHE_KEY);
@@ -236,18 +323,146 @@ const cacheUtils = {
         }
     },
 
-    // Сохранить fallback данные
     saveFallbackData: () => {
         try {
-            const cacheData = {
-                timestamp: Date.now(),
-                data: CONFIG.FALLBACK_DATA,
-                etag: 'fallback'
-            };
-            localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify(cacheData));
-            console.log('Fallback данные сохранены в кэш');
+            cacheUtils.saveToCache(CONFIG.FALLBACK_DATA, 'fallback');
         } catch (error) {
             console.error('Ошибка сохранения fallback данных:', error);
+        }
+    }
+};
+
+// Стратегия фонового обновления
+const backgroundSync = {
+    timer: null,
+    
+    start: function() {
+        if (!checkOnlineStatus()) return;
+        
+        this.stop();
+        
+        this.timer = setInterval(() => {
+            if (checkOnlineStatus()) {
+                console.log('Фоновая синхронизация данных...');
+                backgroundSync.checkAndUpdate();
+            }
+        }, CONFIG.BACKGROUND_SYNC_INTERVAL);
+        
+        console.log('Фоновая синхронизация запущена');
+    },
+    
+    stop: function() {
+        if (this.timer) {
+            clearInterval(this.timer);
+            this.timer = null;
+        }
+    },
+    
+    checkAndUpdate: async function() {
+        try {
+            const cached = cacheUtils.getFromCache();
+            const cachedEtag = cacheUtils.getEtag();
+            
+            if (!cached) return;
+            
+            const hasUpdates = await checkForUpdates(cachedEtag);
+            if (hasUpdates) {
+                console.log('Фоновое обновление: обнаружены новые данные');
+                await loadProductsData(true);
+                showNotification('Данные обновлены в фоновом режиме', 'success');
+            }
+        } catch (error) {
+            console.error('Ошибка фоновой синхронизации:', error);
+        }
+    }
+};
+
+// Потоковая обработка больших JSON
+const streamProcessor = {
+    processLargeJSON: async (response) => {
+        const contentLength = response.headers.get('content-length');
+        if (contentLength && parseInt(contentLength) > CONFIG.MAX_JSON_SIZE) {
+            throw new Error(`Файл слишком большой: ${contentLength} bytes`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let chunks = [];
+        let totalSize = 0;
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) break;
+                
+                totalSize += value.length;
+                if (totalSize > CONFIG.MAX_JSON_SIZE) {
+                    throw new Error('Превышен максимальный размер файла');
+                }
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                
+                buffer = lines.pop() || '';
+                
+                for (const line of lines) {
+                    if (line.trim()) {
+                        try {
+                            const chunk = JSON.parse(line);
+                            chunks.push(chunk);
+                        } catch (e) {
+                            // Игнорируем неполные JSON строки
+                        }
+                    }
+                }
+            }
+
+            if (buffer.trim()) {
+                try {
+                    const finalData = JSON.parse(buffer);
+                    if (Array.isArray(finalData)) {
+                        chunks = chunks.concat(finalData);
+                    } else {
+                        chunks.push(finalData);
+                    }
+                } catch (e) {
+                    console.error('Ошибка парсинга финального блока:', e);
+                }
+            }
+
+            return chunks;
+        } finally {
+            reader.releaseLock();
+        }
+    },
+
+    processInChunks: (data, chunkSize = CONFIG.CHUNK_SIZE, processCallback) => {
+        const results = [];
+        
+        for (let i = 0; i < data.length; i += chunkSize) {
+            const chunk = data.slice(i, i + chunkSize);
+            
+            if (i > 0 && i % (chunkSize * 10) === 0) {
+                setTimeout(() => {
+                    processChunk(chunk, i);
+                }, 0);
+            } else {
+                const processedChunk = processCallback(chunk);
+                results.push(...processedChunk);
+            }
+        }
+        
+        return results;
+        
+        function processChunk(chunk, index) {
+            try {
+                const processedChunk = processCallback(chunk);
+                results.push(...processedChunk);
+            } catch (error) {
+                console.error(`Ошибка обработки чанка ${index}:`, error);
+            }
         }
     }
 };
@@ -255,7 +470,6 @@ const cacheUtils = {
 // Проверка обновлений на сервере
 async function checkForUpdates(cachedEtag) {
     try {
-        // Если оффлайн, не проверяем обновления
         if (!checkOnlineStatus()) {
             console.log('Оффлайн режим, пропускаем проверку обновлений');
             return false;
@@ -269,34 +483,33 @@ async function checkForUpdates(cachedEtag) {
 
         if (response.status === 304) {
             console.log('Данные не изменились на сервере');
-            return false; // Нет обновлений
+            return false;
         }
 
         if (response.status === 200) {
             const newEtag = response.headers.get('ETag');
             if (newEtag && newEtag !== cachedEtag) {
                 console.log('Обнаружены обновления на сервере');
-                return true; // Есть обновлений
+                return true;
             }
         }
 
         return false;
     } catch (error) {
         console.error('Ошибка проверки обновлений:', error);
-        return false; // При ошибке считаем, что обновлений нет
+        return false;
     }
 }
 
 // Загрузка данных о продуктах
-async function loadProductsData() {
+async function loadProductsData(isBackgroundSync = false) {
     try {
-        // Показываем индикатор загрузки
-        if (dataStatus) dataStatus.classList.remove('hidden');
+        if (!isBackgroundSync && dataStatus) {
+            dataStatus.classList.remove('hidden');
+        }
         
-        // Проверяем онлайн статус
         checkOnlineStatus();
         
-        // Проверяем кэш
         const cached = cacheUtils.getFromCache();
         const cachedEtag = cacheUtils.getEtag();
         
@@ -304,7 +517,6 @@ async function loadProductsData() {
         let shouldUpdateCache = false;
 
         if (cached && !cached.isExpired) {
-            // Кэш актуален, проверяем обновления на сервере (только если онлайн)
             if (isOnline) {
                 const hasUpdates = await checkForUpdates(cachedEtag);
                 
@@ -312,23 +524,16 @@ async function loadProductsData() {
                     console.log('Используем актуальные данные из кэша');
                     processProductsData(cached.data);
                     shouldUseCache = true;
-                    
-                    // ОЗВУЧИВАЕМ использование кэшированных данных
-                    voiceUtils.speakDataEvent('Данные загружены из кэша');
                 } else {
-                    console.log('Обнаружены обновления, загружаем новые данные');
                     shouldUpdateCache = true;
                 }
             } else {
-                // Оффлайн режим - используем кэш
                 console.log('Оффлайн режим, используем данные из кэша');
                 processProductsData(cached.data);
                 shouldUseCache = true;
             }
         } else if (cached) {
-            // Кэш просрочен, но данные есть
             if (isOnline) {
-                console.log('Кэш просрочен, проверяем обновления');
                 const hasUpdates = await checkForUpdates(cachedEtag);
                 
                 if (!hasUpdates) {
@@ -337,57 +542,72 @@ async function loadProductsData() {
                     processProductsData(cached.data);
                     shouldUseCache = true;
                 } else {
-                    console.log('Обнаружены обновления, загружаем новые данные');
                     shouldUpdateCache = true;
                 }
             } else {
-                // Оффлайн режим - используем просроченный кэш
                 console.log('Оффлайн режим, используем просроченные данные из кэша');
                 processProductsData(cached.data);
                 shouldUseCache = true;
             }
         } else {
-            // Нет кэша
             if (isOnline) {
-                console.log('Кэш отсутствует, загружаем данные с сервера');
                 shouldUpdateCache = true;
             } else {
-                // Оффлайн и нет кэша - используем fallback данные
                 console.log('Оффлайн режим и нет кэша, используем fallback данные');
                 cacheUtils.saveFallbackData();
                 processProductsData(CONFIG.FALLBACK_DATA);
-                showNotification('Работаем в автономном режиме с тестовыми данными', 'warning');
+                if (!isBackgroundSync) {
+                    showNotification('Работаем в автономном режиме с тестовыми данными', 'warning');
+                }
                 shouldUseCache = true;
             }
         }
 
-        // Загружаем новые данные если нужно
         if (shouldUpdateCache) {
-            // ОЗВУЧИВАЕМ начало загрузки
-            voiceUtils.speakDataEvent('Загружаем актуальные данные');
-            
+            console.log('Загрузка новых данных с сервера...');
             const response = await fetch(CONFIG.JSON_URL, {
-                cache: 'no-cache'
+                cache: 'no-cache',
+                headers: {
+                    'Accept': 'application/json',
+                    'Cache-Control': 'no-cache'
+                }
             });
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             
-            const productsData = await response.json();
+            let productsData;
+            
+            try {
+                productsData = await streamProcessor.processLargeJSON(response);
+                if (!productsData || productsData.length === 0) {
+                    throw new Error('Потоковая обработка не дала результатов');
+                }
+            } catch (streamError) {
+                console.log('Потоковая обработка не удалась, используем стандартный метод:', streamError);
+                productsData = await response.json();
+            }
+            
+            const validatedData = dataValidator.validateSchema(productsData);
+            
             const newEtag = response.headers.get('ETag');
             
-            // Сохраняем в кэш
-            cacheUtils.saveToCache(productsData, newEtag);
+            if (validatedData.length > CONFIG.CHUNK_SIZE) {
+                console.log(`Обработка больших данных: ${validatedData.length} записей`);
+                const processedData = streamProcessor.processInChunks(
+                    validatedData, 
+                    CONFIG.CHUNK_SIZE,
+                    (chunk) => dataValidator.validateSchema(chunk)
+                );
+                cacheUtils.saveToCache(processedData, newEtag);
+                processProductsData(processedData);
+            } else {
+                cacheUtils.saveToCache(validatedData, newEtag);
+                processProductsData(validatedData);
+            }
             
-            // Обрабатываем данные
-            processProductsData(productsData);
-            
-            // ОЗВУЧИВАЕМ успешную загрузку данных
-            voiceUtils.speakDataEvent('Данные успешно обновлены');
-            
-            // Показываем уведомление об успешной загрузке
-            if (cached) {
+            if (!isBackgroundSync && cached) {
                 showNotification('Данные успешно обновлены', 'success');
             }
         }
@@ -395,75 +615,87 @@ async function loadProductsData() {
     } catch (error) {
         console.error('Ошибка загрузки данных:', error);
         
-        // ОЗВУЧИВАЕМ ошибку загрузки
-        voiceUtils.speakNotification('Не удалось загрузить данные', 'error');
-        
-        // Пытаемся использовать кэш, даже если он просрочен
         const cached = cacheUtils.getFromCache();
         if (cached) {
             console.log('Используем данные из кэша из-за ошибки сети');
             processProductsData(cached.data);
-            showNotification('Не удалось загрузить актуальные данные. Используются кэшированные данные.', 'warning');
+            if (!isBackgroundSync) {
+                showNotification('Не удалось загрузить актуальные данные. Используются кэшированные данные.', 'warning');
+            }
         } else {
-            // Нет кэша и не удалось загрузить данные - используем fallback
             console.log('Нет кэша, используем fallback данные');
             cacheUtils.saveFallbackData();
             processProductsData(CONFIG.FALLBACK_DATA);
-            showNotification('Не удалось загрузить данные. Используются тестовые данные.', 'error');
+            if (!isBackgroundSync) {
+                showNotification('Не удалось загрузить данные. Используются тестовые данные.', 'error');
+            }
         }
     } finally {
-        // Скрываем индикатор загрузки
-        if (dataStatus) {
+        if (!isBackgroundSync && dataStatus) {
             dataStatus.classList.add('hidden');
+        }
+        
+        if (!isBackgroundSync) {
+            backgroundSync.start();
         }
     }
 }
 
 // Обработка данных о продуктах
 function processProductsData(productsData) {
-    products = {}; // Очищаем предыдущие данные
+    products = {};
+    productsArray = productsData;
     
-    // Преобразуем массив в объект для быстрого поиска по коду
-    productsData.forEach(product => {
-        products[product["Код продукции"]] = {
-            "Полное наименование (русское)": product["Полное наименование (русское)"],
-            "Срок годности": product["Срок годности"],
-            "Штук в упаковке": product["Штук в упаковке"],
-            "Штрихкод упаковки": product["Штрихкод упаковки"],
-            "Производитель": product["Производитель"],
-            "Название стандарта": product["Название стандарта"]
-        };
-    });
+    if (productsData.length > CONFIG.CHUNK_SIZE) {
+        streamProcessor.processInChunks(productsData, CONFIG.CHUNK_SIZE, (chunk) => {
+            chunk.forEach(product => {
+                products[product["Код продукции"]] = {
+                    "Полное наименование (русское)": product["Полное наименование (русское)"],
+                    "Срок годности": product["Срок годности"],
+                    "Штук в упаковке": product["Штук в упаковке"],
+                    "Штрихкод упаковки": product["Штрихкод упаковки"],
+                    "Производитель": product["Производитель"],
+                    "Название стандарта": product["Название стандарта"]
+                };
+            });
+            return chunk;
+        });
+    } else {
+        productsData.forEach(product => {
+            products[product["Код продукции"]] = {
+                "Полное наименование (русское)": product["Полное наименование (русское)"],
+                "Срок годности": product["Срок годности"],
+                "Штук в упаковке": product["Штук в упаковке"],
+                "Штрихкод упаковки": product["Штрихкод упаковки"],
+                "Производитель": product["Производитель"],
+                "Название стандарта": product["Название стандарта"]
+            };
+        });
+    }
     
-    // Активируем поля ввода
     activateInputFields();
 }
 
-// Активация полей ввода
+// Активация полей ввода после загрузки данных
 function activateInputFields() {
-    if (productSearch) productSearch.disabled = false;
-    if (calculateButton) calculateButton.disabled = false;
-}
-
-// Принудительное обновление данных
-async function forceRefreshData() {
-    console.log('Принудительное обновление данных');
-    if (!checkOnlineStatus()) {
-        showNotification('Нет подключения к интернету. Обновление невозможно.', 'error');
-        return;
+    if (productSearch) {
+        productSearch.disabled = false;
+        productSearch.placeholder = "Введите код или название продукта...";
     }
     
-    // ОЗВУЧИВАЕМ начало принудительного обновления
-    voiceUtils.speakDataEvent('Обновляем данные');
+    if (calculateButton) {
+        calculateButton.disabled = false;
+        calculateButton.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
     
-    cacheUtils.clearCache();
-    await loadProductsData();
+    console.log(`Загружено ${Object.keys(products).length} продуктов`);
 }
 
-// Поиск продуктов
-if (productSearch) {
-    productSearch.addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase();
+// Оптимизированный поиск с дебаунсом
+const searchUtils = {
+    timeout: null,
+    
+    search: function(searchTerm) {
         if (searchResults) searchResults.innerHTML = '';
         if (standardNotificationContainer) standardNotificationContainer.innerHTML = '';
         
@@ -473,30 +705,34 @@ if (productSearch) {
             return;
         }
 
+        if (searchWorker && productsArray.length > 1000) {
+            searchWorker.postMessage({ 
+                type: 'SEARCH', 
+                data: { 
+                    searchTerm: searchTerm.toLowerCase(),
+                    maxResults: 50
+                } 
+            });
+        } else {
+            this.performSearch(searchTerm);
+        }
+    },
+    
+    performSearch: function(searchTerm) {
+        const term = searchTerm.toLowerCase();
         let resultsFound = false;
+        let resultsCount = 0;
 
         for (const code in products) {
+            if (resultsCount >= 50) break;
+            
             const product = products[code];
-            if (code.includes(searchTerm) ||
-                product["Полное наименование (русское)"].toLowerCase().includes(searchTerm)) {
+            if (code.includes(term) ||
+                product["Полное наименование (русское)"].toLowerCase().includes(term)) {
 
-                const div = document.createElement('div');
-                div.className = 'p-3 hover:bg-blue-50 cursor-pointer flex items-center border-b border-gray-100 last:border-0';
-                div.setAttribute('role', 'option');
-                div.innerHTML = `
-                <div class="bg-blue-100 p-2 rounded-lg mr-3">
-                  <i class="fas fa-box text-blue-600"></i>
-                </div>
-                <div>
-                  <div class="font-medium text-blue-800">${product["Полное наименование (русское)"]}</div>
-                  <div class="text-sm text-gray-500">Код: <span class="product-code">${code}</span> | Срок: <span class="shelf-life">${product["Срок годности"]} дней</span></div>
-                </div>
-                `;
-                div.onclick = function() {
-                    selectProduct(code);
-                };
-                if (searchResults) searchResults.appendChild(div);
+                this.addSearchResult(code, product);
                 resultsFound = true;
+                resultsCount++;
             }
         }
 
@@ -504,233 +740,303 @@ if (productSearch) {
             if (resultsFound) {
                 searchResults.classList.remove('hidden');
             } else {
-                const noResults = document.createElement('div');
-                noResults.className = 'p-3 text-gray-500 text-center';
-                noResults.textContent = 'Ничего не найдено';
-                noResults.setAttribute('role', 'option');
-                searchResults.appendChild(noResults);
-                searchResults.classList.remove('hidden');
+                this.showNoResults();
             }
         }
-    });
+    },
+    
+    addSearchResult: function(code, product) {
+        const div = document.createElement('div');
+        div.className = 'search-result-item';
+        div.setAttribute('role', 'option');
+        div.innerHTML = `
+            <div class="flex items-center">
+                <div class="bg-blue-100 p-2 rounded-lg mr-3">
+                    <i class="fas fa-box text-blue-600"></i>
+                </div>
+                <div class="flex-grow">
+                    <div class="search-result-name">${this.escapeHtml(product["Полное наименование (русское)"])}</div>
+                    <div class="text-sm text-gray-500 mt-1">
+                        <span class="search-result-code">Код: ${code}</span> | 
+                        <span class="search-result-shelf-life">Срок: ${product["Срок годности"]} дней</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        div.onclick = () => selectProduct(code);
+        if (searchResults) searchResults.appendChild(div);
+    },
+    
+    showNoResults: function() {
+        const noResults = document.createElement('div');
+        noResults.className = 'p-4 text-gray-500 text-center';
+        noResults.innerHTML = `
+            <i class="fas fa-search text-gray-300 text-2xl mb-2"></i>
+            <p>Ничего не найдено</p>
+            <p class="text-sm mt-1">Попробуйте изменить запрос</p>
+        `;
+        noResults.setAttribute('role', 'option');
+        if (searchResults) searchResults.appendChild(noResults);
+        if (searchResults) searchResults.classList.remove('hidden');
+    },
+    
+    escapeHtml: function(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+};
+
+// Показать отсутствие результатов
+function showNoResults() {
+    const noResults = document.createElement('div');
+    noResults.className = 'p-4 text-gray-500 text-center';
+    noResults.innerHTML = `
+        <i class="fas fa-search text-gray-300 text-2xl mb-2"></i>
+        <p>Ничего не найдено</p>
+        <p class="text-sm mt-1">Попробуйте изменить запрос</p>
+    `;
+    noResults.setAttribute('role', 'option');
+    if (searchResults) searchResults.appendChild(noResults);
+    if (searchResults) searchResults.classList.remove('hidden');
+}
+
+// Добавить результат поиска
+function addSearchResult(code, product) {
+    const div = document.createElement('div');
+    div.className = 'search-result-item';
+    div.setAttribute('role', 'option');
+    div.innerHTML = `
+        <div class="flex items-center">
+            <div class="bg-blue-100 p-2 rounded-lg mr-3">
+                <i class="fas fa-box text-blue-600"></i>
+            </div>
+            <div class="flex-grow">
+                <div class="search-result-name">${escapeHtml(product["Полное наименование (русское)"])}</div>
+                <div class="text-sm text-gray-500 mt-1">
+                    <span class="search-result-code">Код: ${code}</span> | 
+                    <span class="search-result-shelf-life">Срок: ${product["Срок годности"]} дней</span>
+                </div>
+            </div>
+        </div>
+    `;
+    div.onclick = () => selectProduct(code);
+    if (searchResults) searchResults.appendChild(div);
+}
+
+// Экранирование HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Выбор продукта
+function selectProduct(productCode) {
+    const product = products[productCode];
+    if (product) {
+        document.getElementById('productCode').value = productCode;
+        document.getElementById('productName').value = product["Полное наименование (русское)"];
+        document.getElementById('shelfLife').value = product["Срок годности"];
+        document.getElementById('quantityPerPack').value = product["Штук в упаковке"] || '';
+        document.getElementById('groupBarcode').value = product["Штрихкод упаковки"] || '';
+        document.getElementById('manufacturerBarcode').value = product["Производитель"] || '';
+        
+        if (product["Название стандарта"] && standardNotificationContainer) {
+            standardNotificationContainer.innerHTML = `
+                <div class="standard-notification standard-notification-success">
+                    <div class="flex items-center">
+                        <i class="fas fa-file-contract text-green-500 mr-2"></i>
+                        <div>
+                            <p class="font-medium">Стандарт качества</p>
+                            <p class="text-sm">${product["Название стандарта"]}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (searchResults) searchResults.classList.add('hidden');
+        if (productSearch) productSearch.value = '';
+        
+        showNotification(`Продукт "${product["Полное наименование (русское)"]}" выбран`, 'success');
+    }
 }
 
 // Очистка полей
 function clearFields() {
-    const fields = [
-        'productCode', 'productName', 'shelfLife', 
-        'quantityPerPack', 'groupBarcode', 'manufacturerBarcode'
-    ];
+    document.getElementById('productCode').value = '';
+    document.getElementById('productName').value = '';
+    document.getElementById('shelfLife').value = '';
+    document.getElementById('quantityPerPack').value = '';
+    document.getElementById('groupBarcode').value = '';
+    document.getElementById('manufacturerBarcode').value = '';
     
-    fields.forEach(field => {
-        const element = document.getElementById(field);
-        if (element) element.value = '';
-    });
-    
-    const warningMsg = document.getElementById('warningMessage');
-    if (warningMsg) {
-        warningMsg.remove();
-        warningMessageAdded = false;
-    }
-}
-
-// Закрытие результатов поиска при клике вне области
-document.addEventListener('click', function(e) {
-    if (productSearch && searchResults) {
-        if (!productSearch.contains(e.target) && !searchResults.contains(e.target)) {
-            searchResults.classList.add('hidden');
-        }
-    }
-});
-
-// Выбор продукта из результатов поиска
-function selectProduct(code) {
-    const product = products[code];
-    
-    const productCodeElem = document.getElementById('productCode');
-    const productNameElem = document.getElementById('productName');
-    const shelfLifeElem = document.getElementById('shelfLife');
-    const quantityPerPackElem = document.getElementById('quantityPerPack');
-    const groupBarcodeElem = document.getElementById('groupBarcode');
-    const manufacturerBarcodeElem = document.getElementById('manufacturerBarcode');
-    
-    if (productCodeElem) productCodeElem.value = code;
-    if (productNameElem) productNameElem.value = product["Полное наименование (русское)"];
-    if (shelfLifeElem) shelfLifeElem.value = product["Срок годности"];
-    if (quantityPerPackElem) quantityPerPackElem.value = product["Штук в упаковке"] || "";
-    if (groupBarcodeElem) groupBarcodeElem.value = product["Штрихкод упаковки"] || "";
-    if (manufacturerBarcodeElem) manufacturerBarcodeElem.value = product["Производитель"] || "";
-
-    if (productSearch) productSearch.value = '';
-    if (searchResults) searchResults.classList.add('hidden');
-
-    if (product["Название стандарта"] && standardNotificationContainer) {
-        showStandardNotification("Статус: " + product["Название стандарта"]);
+    if (standardNotificationContainer) {
+        standardNotificationContainer.innerHTML = '';
     }
     
-    if (!warningMessageAdded) {
-        const warningMessage = document.createElement('div');
-        warningMessage.id = 'warningMessage';
-        warningMessage.className = 'mt-4 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700';
-        warningMessage.textContent = 'Важно! Для завершения процесса нажмите кнопку "Рассчитать срок годности".';
-        
-        const calculateButton = document.querySelector('button[onclick="calculateExpiry()"]');
-        if (calculateButton) {
-            calculateButton.parentNode.insertBefore(warningMessage, calculateButton);
-            warningMessageAdded = true;
-        }
+    const resultElement = document.getElementById('result');
+    if (resultElement) {
+        resultElement.classList.add('hidden');
     }
-}
-
-// Показать стандартное уведомление
-function showStandardNotification(standard) {
-    if (!standardNotificationContainer) return;
-    
-    standardNotificationContainer.innerHTML = '';
-    
-    if (!standard || standard === 'Не указано') return;
-    
-    const notification = document.createElement('div');
-    notification.className = 'p-3 rounded-lg shadow-md bg-blue-100 border border-blue-300 text-blue-800 slide-in';
-    notification.setAttribute('aria-live', 'polite');
-    notification.innerHTML = `
-        <div class="flex items-start">
-            <div class="flex-grow break-words">${standard}</div>
-        </div>
-    `;
-    standardNotificationContainer.appendChild(notification);
 }
 
 // Расчет срока годности
 function calculateExpiry() {
-    const shelfLifeElem = document.getElementById('shelfLife');
-    const productionDateElem = document.getElementById('productionDate');
-    const expiryDateElem = document.getElementById('expiryDate');
-    const resultDiv = document.getElementById('result');
+    const productionDateInput = document.getElementById('productionDate');
+    const shelfLifeInput = document.getElementById('shelfLife');
+    const resultElement = document.getElementById('result');
+    const expiryDateElement = document.getElementById('expiryDate');
     
-    if (!shelfLifeElem || !productionDateElem || !expiryDateElem || !resultDiv) return;
-    
-    const shelfLife = parseInt(shelfLifeElem.value);
-    const productionDate = productionDateElem.value;
-
-    if (!shelfLife || !productionDate) {
-        showNotification('Пожалуйста, выберите продукт и укажите дату производства', 'error');
+    if (!productionDateInput || !shelfLifeInput || !resultElement || !expiryDateElement) {
+        showNotification('Ошибка: не найдены необходимые элементы', 'error');
         return;
     }
-
-    const production = new Date(productionDate);
-    const expiryDate = new Date(production);
-    expiryDate.setDate(production.getDate() + shelfLife);
-
-    const options = { year: 'numeric', month: 'numeric', day: 'numeric' };
-    const formattedDate = expiryDate.toLocaleDateString('ru-RU', options);
-
-    expiryDateElem.textContent = formattedDate;
-
-    resultDiv.classList.remove('hidden');
-    resultDiv.classList.add('fade-in');
-
-    const warningMsg = document.getElementById('warningMessage');
-    if (warningMsg) {
-        warningMsg.remove();
-        warningMessageAdded = false;
+    
+    const productionDate = productionDateInput.value;
+    const shelfLife = parseInt(shelfLifeInput.value);
+    
+    if (!productionDate) {
+        showNotification('Пожалуйста, укажите дату производства', 'error');
+        return;
     }
-
-    setTimeout(() => {
-        resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 100);
+    
+    if (isNaN(shelfLife) || shelfLife <= 0) {
+        showNotification('Пожалуйста, выберите продукт для расчета срока годности', 'error');
+        return;
+    }
+    
+    try {
+        const productionDateObj = new Date(productionDate);
+        if (isNaN(productionDateObj.getTime())) {
+            throw new Error('Неверный формат даты');
+        }
+        
+        const expiryDate = new Date(productionDateObj);
+        expiryDate.setDate(expiryDate.getDate() + shelfLife);
+        
+        const formattedDate = expiryDate.toLocaleDateString('ru-RU', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long'
+        });
+        
+        expiryDateElement.textContent = formattedDate;
+        resultElement.classList.remove('hidden');
+        
+        showNotification(`Срок годности рассчитан: ${formattedDate}`, 'success');
+        
+    } catch (error) {
+        console.error('Ошибка расчета срока годности:', error);
+        showNotification('Ошибка при расчете срока годности', 'error');
+    }
 }
 
 // Показать уведомление
-function showNotification(message, type) {
-    // ОЗВУЧИВАЕМ уведомление
-    voiceUtils.speakNotification(message, type);
-    
-    const existingNotifications = document.querySelectorAll('.notification-message');
-    existingNotifications.forEach(notification => notification.remove());
-
+function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
-    notification.className = `notification-message fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-medium z-50 transition-all duration-300 transform translate-x-0 opacity-100 ${
-        type === 'success' ? 'bg-green-500' : 
-        type === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
-    }`;
-    notification.setAttribute('aria-live', 'assertive');
+    notification.className = `notification-message notification-${type} slide-in`;
     notification.innerHTML = `
-    <div class="flex items-center">
-      <i class="fas ${
-          type === 'success' ? 'fa-check-circle' : 
-          type === 'warning' ? 'fa-exclamation-triangle' : 'fa-exclamation-circle'
-      } mr-2"></i>
-      ${message}
-    </div>
+        <div class="flex items-center">
+            <i class="fas ${getNotificationIcon(type)} mr-2"></i>
+            <span>${message}</span>
+        </div>
     `;
+    
     document.body.appendChild(notification);
-
+    
     setTimeout(() => {
-        notification.classList.add('translate-x-full', 'opacity-0');
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 5000);
+}
+
+// Получить иконку для уведомления
+function getNotificationIcon(type) {
+    switch (type) {
+        case 'success': return 'fa-check-circle';
+        case 'warning': return 'fa-exclamation-triangle';
+        case 'error': return 'fa-times-circle';
+        case 'info': 
+        default: return 'fa-info-circle';
+    }
+}
+
+// Принудительное обновление данных
+function forceRefreshData() {
+    cacheUtils.clearCache();
+    showNotification('Кэш очищен, загружаем свежие данные...', 'info');
+    loadProductsData();
 }
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
-    // Инициализируем голоса
-    if (voiceUtils.isSupported()) {
-        // Ждем загрузки голосов
-        const initVoices = () => {
-            const voices = speechSynthesis.getVoices();
-            if (voices.length > 0) {
-                console.log('🔊 Инициализация голосового синтеза:');
-                voiceUtils.showAvailableVoices();
-                
-                // УБРАНА ТЕСТОВАЯ ФРАЗА
-            } else {
-                setTimeout(initVoices, 100);
-            }
-        };
-        
-        // Запускаем инициализацию голосов
-        initVoices();
-        
-        // Некоторые браузеры загружают голоса асинхронно
-        speechSynthesis.addEventListener('voiceschanged', initVoices);
-    } else {
-        console.log('❌ Браузер не поддерживает синтез речи');
-    }
+    initSearchWorker();
     
     const productionDateElem = document.getElementById('productionDate');
     if (productionDateElem) {
         const today = new Date();
-        const day = String(today.getDate()).padStart(2, '0');
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const year = today.getFullYear();
-
-        productionDateElem.value = `${year}-${month}-${day}`;
+        productionDateElem.value = today.toISOString().split('T')[0];
     }
     
-    // Слушатели событий онлайн/оффлайн
+    if (productSearch) {
+        productSearch.addEventListener('input', function() {
+            clearTimeout(searchUtils.timeout);
+            searchUtils.timeout = setTimeout(() => {
+                searchUtils.search(this.value);
+            }, 300);
+        });
+        
+        productSearch.addEventListener('focus', function() {
+            if (this.value.length >= 2) {
+                searchUtils.search(this.value);
+            }
+        });
+    }
+    
+    document.addEventListener('click', (event) => {
+        if (searchResults && !searchResults.contains(event.target) && 
+            productSearch && !productSearch.contains(event.target)) {
+            searchResults.classList.add('hidden');
+        }
+    });
+    
     window.addEventListener('online', () => {
         console.log('Онлайн статус: онлайн');
         checkOnlineStatus();
+        backgroundSync.start();
         showNotification('Подключение к интернету восстановлено', 'success');
-        
-        // ОЗВУЧИВАЕМ восстановление связи
-        voiceUtils.speakSystemEvent('Подключение восстановлено');
     });
     
     window.addEventListener('offline', () => {
         console.log('Онлайн статус: оффлайн');
         checkOnlineStatus();
+        backgroundSync.stop();
         showNotification('Потеряно подключение к интернету. Работаем автономно.', 'warning');
-        
-        // ОЗВУЧИВАЕМ потерю связи
-        voiceUtils.speakSystemEvent('Работаем автономно');
     });
     
-    // Загружаем данные о продуктах
     loadProductsData();
 });
 
-// Экспортируем функции для глобального использования
+// Очистка при выгрузке страницы
+window.addEventListener('beforeunload', () => {
+    backgroundSync.stop();
+    if (searchWorker) {
+        searchWorker.terminate();
+    }
+});
+
+// Глобальный экспорт функций
 window.calculateExpiry = calculateExpiry;
+window.selectProduct = selectProduct;
+window.clearFields = clearFields;
+window.showNotification = showNotification;
 window.forceRefreshData = forceRefreshData;
+window.backgroundSync = backgroundSync;
