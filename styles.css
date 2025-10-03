@@ -1,3 +1,8 @@
+/* Jekyll Architect Theme Styles */
+
+/* ==========================================================================
+   CSS Variables (Custom Properties)
+   ========================================================================== */
 :root {
     --primary-color: #2c3e50;
     --secondary-color: #3498db;
@@ -8,6 +13,10 @@
     --border-color: #ddd;
     --shadow-color: rgba(0, 0, 0, 0.1);
 }
+
+/* ==========================================================================
+   Base Styles
+   ========================================================================== */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: var(--text-color);
@@ -20,6 +29,10 @@ body {
     margin: 0 auto;
     padding: 0 15px;
 }
+
+/* ==========================================================================
+   Header Styles
+   ========================================================================== */
 .header {
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--dark-color) 100%);
     color: white;
@@ -46,6 +59,10 @@ body {
     position: relative;
     z-index: 1;
 }
+
+/* ==========================================================================
+   Card Components
+   ========================================================================== */
 .card {
     background: white;
     border-radius: 8px;
@@ -69,6 +86,10 @@ body {
 .card-body {
     padding: 1.5rem;
 }
+
+/* ==========================================================================
+   Form Elements
+   ========================================================================== */
 input, select, textarea {
     width: 100%;
     padding: 0.75rem;
@@ -88,6 +109,10 @@ input[readonly] {
     background-color: #f8f9fa;
     color: #6c757d;
 }
+
+/* ==========================================================================
+   Button Styles
+   ========================================================================== */
 .btn {
     display: inline-block;
     font-weight: 600;
@@ -136,6 +161,10 @@ input[readonly] {
     background-color: #6c757d;
     box-shadow: none;
 }
+
+/* ==========================================================================
+   Layout & Grid System
+   ========================================================================== */
 .grid {
     display: grid;
     gap: 1.5rem;
@@ -144,6 +173,11 @@ input[readonly] {
 .grid-2 {
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
+
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
+
 /* Text Alignment */
 .text-center { text-align: center; }
 .text-right { text-align: right; }
@@ -177,6 +211,10 @@ input[readonly] {
 .flex { display: flex; }
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
+
+/* ==========================================================================
+   Animations & Transitions
+   ========================================================================== */
 .fade-in {
     animation: fadeIn 0.5s ease-in-out;
 }
@@ -200,6 +238,10 @@ input[readonly] {
         opacity: 1;
     }
 }
+
+/* ==========================================================================
+   Loading Spinner
+   ========================================================================== */
 .loading-spinner {
     width: 20px;
     height: 20px;
@@ -214,6 +256,10 @@ input[readonly] {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
 .footer {
     background: var(--dark-color);
     color: white;
@@ -221,6 +267,10 @@ input[readonly] {
     text-align: center;
     margin-top: 3rem;
 }
+
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
 @media (max-width: 768px) {
     .container {
         padding: 0 10px;
@@ -244,6 +294,10 @@ input[readonly] {
         padding: 1rem;
     }
 }
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
 @media print {
     .header, .footer, .btn {
         display: none;
@@ -254,6 +308,10 @@ input[readonly] {
         border: 1px solid var(--border-color);
     }
 }
+
+/* ==========================================================================
+   Custom Scrollbar
+   ========================================================================== */
 ::-webkit-scrollbar {
     width: 8px;
 }
@@ -270,6 +328,11 @@ input[readonly] {
 ::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
 }
+
+/* ==========================================================================
+   Accessibility
+   ========================================================================== */
+
 /* Focus styles */
 *:focus {
     outline: 2px solid var(--secondary-color);
@@ -295,6 +358,11 @@ input[readonly] {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* ==========================================================================
+   Custom Component Styles
+   ========================================================================== */
+
 /* Стили для элементов в выпадающем списке */
 .product-code {
     background-color: #dbeafe;
